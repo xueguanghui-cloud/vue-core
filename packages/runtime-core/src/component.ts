@@ -846,10 +846,10 @@ function setupStatefulComponent(
       )
     }
   }
-  // 0. create render proxy property access cache
+  // 0. create render proxy property access cache 创建缓存
   instance.accessCache = Object.create(null)
   // 1. create public instance / render proxy
-  instance.proxy = new Proxy(instance.ctx, PublicInstanceProxyHandlers)
+  instance.proxy = new Proxy(instance.ctx, PublicInstanceProxyHandlers)  // 创建代理
   if (__DEV__) {
     exposePropsOnRenderContext(instance)
   }

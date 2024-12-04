@@ -69,9 +69,10 @@ const rendererOptions = /*@__PURE__*/ extend({ patchProp }, nodeOps)
 // in case the user only imports reactivity utilities from Vue.
 let renderer: Renderer<Element | ShadowRoot> | HydrationRenderer
 
-let enabledHydration = false
+let enabledHydration = false // 是否已经初始化过
 
 function ensureRenderer() {
+  // 如果 renderer 有值的话，那么以后都不会初始化了
   return (
     renderer ||
     (renderer = createRenderer<Node, Element | ShadowRoot>(rendererOptions))
@@ -95,6 +96,7 @@ export const hydrate = ((...args) => {
   ensureHydrationRenderer().hydrate(...args)
 }) as RootHydrateFunction
 
+createApp(App)
 export const createApp = ((...args) => {
   const app = ensureRenderer().createApp(...args)
 

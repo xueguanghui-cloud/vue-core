@@ -301,7 +301,7 @@ export let isBlockTreeEnabled = 1
  *
  * ``` js
  * _cache[1] || (
- *   setBlockTracking(-1),
+ *   setBlockTracking(-1, true),
  *   _cache[1] = createVNode(...),
  *   setBlockTracking(1),
  *   _cache[1]
@@ -310,11 +310,11 @@ export let isBlockTreeEnabled = 1
  *
  * @private
  */
-export function setBlockTracking(value: number): void {
+export function setBlockTracking(value: number, inVOnce = false): void {
   isBlockTreeEnabled += value
-  if (value < 0 && currentBlock) {
+  if (value < 0 && currentBlock && inVOnce) {
     // mark current block so it doesn't take fast path and skip possible
-    // nested components duriung unmount
+    // nested components during unmount
     currentBlock.hasOnce = true
   }
 }
@@ -607,15 +607,15 @@ function _createVNode(
 
   // encode the vnode type information into a bitmap
   const shapeFlag = isString(type)
-    ? ShapeFlags.ELEMENT
+    ? ShapeFlags.ELEMENT // element
     : __FEATURE_SUSPENSE__ && isSuspense(type)
-      ? ShapeFlags.SUSPENSE
+      ? ShapeFlags.SUSPENSE // suspense 异步组件
       : isTeleport(type)
-        ? ShapeFlags.TELEPORT
+        ? ShapeFlags.TELEPORT // teleport 组件
         : isObject(type)
-          ? ShapeFlags.STATEFUL_COMPONENT
+          ? ShapeFlags.STATEFUL_COMPONENT // 有状态组件
           : isFunction(type)
-            ? ShapeFlags.FUNCTIONAL_COMPONENT
+            ? ShapeFlags.FUNCTIONAL_COMPONENT // 函数式组件
             : 0
 
   if (__DEV__ && shapeFlag & ShapeFlags.STATEFUL_COMPONENT && isProxy(type)) {

@@ -381,11 +381,12 @@ function baseCreateRenderer(
     slotScopeIds = null,
     optimized = __DEV__ && isHmrUpdating ? false : !!n2.dynamicChildren,
   ) => {
+    // 新旧虚拟节点相同 则直接返回
     if (n1 === n2) {
       return
     }
 
-    // patching & not same type, unmount old tree
+    // patching & not same type, unmount old tree 对于类型不同的新老节点，直接进行卸载旧节点树
     if (n1 && !isSameVNodeType(n1, n2)) {
       anchor = getNextHostNode(n1)
       unmount(n1, parentComponent, parentSuspense, true)
@@ -414,7 +415,7 @@ function baseCreateRenderer(
         break
       case Fragment:
         processFragment(
-          n1,
+          n1, // 老节点
           n2,
           container,
           anchor,
@@ -1175,6 +1176,7 @@ function baseCreateRenderer(
     // mounting
     const compatMountInstance =
       __COMPAT__ && initialVNode.isCompatRoot && initialVNode.component
+    // 1. 先创建一个 component instance
     const instance: ComponentInternalInstance =
       compatMountInstance ||
       (initialVNode.component = createComponentInstance(
@@ -1202,6 +1204,7 @@ function baseCreateRenderer(
       if (__DEV__) {
         startMeasure(instance, `init`)
       }
+      // 2. 初始化 instance 上的 props, slots, 执行组件的 setup 函数...
       setupComponent(instance, false, optimized)
       if (__DEV__) {
         endMeasure(instance, `init`)
@@ -1224,6 +1227,7 @@ function baseCreateRenderer(
         processCommentNode(null, placeholder, container!, anchor)
       }
     } else {
+      // 3. 设置并运行带副作用的渲染函数
       setupRenderEffect(
         instance,
         initialVNode,
@@ -1354,6 +1358,7 @@ function baseCreateRenderer(
           if (__DEV__) {
             startMeasure(instance, `render`)
           }
+          // 渲染子树的 vnode
           const subTree = (instance.subTree = renderComponentRoot(instance))
           if (__DEV__) {
             endMeasure(instance, `render`)
@@ -1361,6 +1366,7 @@ function baseCreateRenderer(
           if (__DEV__) {
             startMeasure(instance, `patch`)
           }
+          // 挂载子树 vnode 到 container 中
           patch(
             null,
             subTree,
@@ -1373,6 +1379,7 @@ function baseCreateRenderer(
           if (__DEV__) {
             endMeasure(instance, `patch`)
           }
+          // 把渲染生成的子树根 DOM 节点存储到 el 属性上
           initialVNode.el = subTree.el
         }
         // mounted hook
@@ -2353,10 +2360,12 @@ function baseCreateRenderer(
   let isFlushing = false
   const render: RootRenderFunction = (vnode, container, namespace) => {
     if (vnode == null) {
+      // 如果vnode 不存在，则标识需要卸载组件
       if (container._vnode) {
         unmount(container._vnode, null, null, true)
       }
     } else {
+      // 否则进入更新流程（初始化创建也是特殊的一种更新）
       patch(
         container._vnode || null,
         vnode,
@@ -2367,6 +2376,7 @@ function baseCreateRenderer(
         namespace,
       )
     }
+    // 缓存vnode
     container._vnode = vnode
     if (!isFlushing) {
       isFlushing = true
