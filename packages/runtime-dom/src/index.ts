@@ -71,6 +71,7 @@ let renderer: Renderer<Element | ShadowRoot> | HydrationRenderer
 
 let enabledHydration = false // 是否已经初始化过
 
+// 创建 renderer
 function ensureRenderer() {
   // 如果 renderer 有值的话，那么以后都不会初始化了
   return (
@@ -96,7 +97,6 @@ export const hydrate = ((...args) => {
   ensureHydrationRenderer().hydrate(...args)
 }) as RootHydrateFunction
 
-createApp(App)
 export const createApp = ((...args) => {
   const app = ensureRenderer().createApp(...args)
 
@@ -106,6 +106,7 @@ export const createApp = ((...args) => {
   }
 
   const { mount } = app
+  //  重写 mount 方法
   app.mount = (containerOrSelector: Element | ShadowRoot | string): any => {
     const container = normalizeContainer(containerOrSelector)
     if (!container) return

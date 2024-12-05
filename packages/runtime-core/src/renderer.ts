@@ -337,7 +337,7 @@ function baseCreateRenderer(
   createHydrationFns: typeof createHydrationFunctions,
 ): HydrationRenderer
 
-// implementation
+// 生成 createRenderer 函数
 function baseCreateRenderer(
   options: RendererOptions,
   createHydrationFns?: typeof createHydrationFunctions,
@@ -368,8 +368,8 @@ function baseCreateRenderer(
     insertStaticContent: hostInsertStaticContent,
   } = options
 
-  // Note: functions inside this closure should use `const xxx = () => {}`
-  // style in order to prevent being inlined by minifiers.
+  //注意：此闭包内的函数应使用 `const xxx = () => {}`
+  //样式以防止被缩小器内联。
   const patch: PatchFn = (
     n1,
     n2,
@@ -400,20 +400,20 @@ function baseCreateRenderer(
 
     const { type, ref, shapeFlag } = n2
     switch (type) {
-      case Text:
+      case Text: // 文本节点
         processText(n1, n2, container, anchor)
         break
-      case Comment:
+      case Comment: // 注释节点
         processCommentNode(n1, n2, container, anchor)
         break
-      case Static:
+      case Static: // 静态节点
         if (n1 == null) {
           mountStaticNode(n2, container, anchor, namespace)
         } else if (__DEV__) {
           patchStaticNode(n1, n2, container, namespace)
         }
         break
-      case Fragment:
+      case Fragment: // 片段节点
         processFragment(
           n1, // 老节点
           n2,
@@ -428,6 +428,7 @@ function baseCreateRenderer(
         break
       default:
         if (shapeFlag & ShapeFlags.ELEMENT) {
+          // 元素节点
           processElement(
             n1,
             n2,
@@ -440,6 +441,7 @@ function baseCreateRenderer(
             optimized,
           )
         } else if (shapeFlag & ShapeFlags.COMPONENT) {
+          // 组件节点
           processComponent(
             n1,
             n2,
@@ -452,6 +454,7 @@ function baseCreateRenderer(
             optimized,
           )
         } else if (shapeFlag & ShapeFlags.TELEPORT) {
+          // teleport节点
           ;(type as typeof TeleportImpl).process(
             n1 as TeleportVNode,
             n2 as TeleportVNode,
@@ -465,6 +468,7 @@ function baseCreateRenderer(
             internals,
           )
         } else if (__FEATURE_SUSPENSE__ && shapeFlag & ShapeFlags.SUSPENSE) {
+          // suspense节点
           ;(type as typeof SuspenseImpl).process(
             n1,
             n2,
@@ -1211,17 +1215,17 @@ function baseCreateRenderer(
       }
     }
 
-    // setup() is async. This component relies on async logic to be resolved
-    // before proceeding
+    //setup() 是异步的。该组件依赖异步逻辑来解析
+    //在继续之前
     if (__FEATURE_SUSPENSE__ && instance.asyncDep) {
-      // avoid hydration for hmr updating
+      //避免水合以进行 hmr 更新
       if (__DEV__ && isHmrUpdating) initialVNode.el = null
 
       parentSuspense &&
         parentSuspense.registerDep(instance, setupRenderEffect, optimized)
 
-      // Give it a placeholder if this is not hydration
-      // TODO handle self-defined fallback
+      //如果这不是水合作用，则给它一个占位符
+      //TODO 处理自定义回退
       if (!initialVNode.el) {
         const placeholder = (instance.subTree = createVNode(Comment))
         processCommentNode(null, placeholder, container!, anchor)

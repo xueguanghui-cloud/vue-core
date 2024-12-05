@@ -248,6 +248,7 @@ export type CreateAppFunction<HostElement> = (
 
 let uid = 0
 
+// 创建App函数
 export function createAppAPI<HostElement>(
   render: RootRenderFunction<HostElement>,
   hydrate?: RootHydrateFunction,
@@ -369,8 +370,8 @@ export function createAppAPI<HostElement>(
           }
           // 1. 创建根组件的 vnode
           const vnode = app._ceVNode || createVNode(rootComponent, rootProps)
-          // store app context on the root VNode.
-          // this will be set on the root instance on initial mount.
+          //将应用程序上下文存储在根 VNode 上。
+          //这将在初始安装时在根实例上设置。
           vnode.appContext = context
 
           if (namespace === true) {
