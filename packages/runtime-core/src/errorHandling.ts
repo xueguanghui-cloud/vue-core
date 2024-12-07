@@ -67,6 +67,21 @@ export const ErrorTypeStrings: Record<ErrorTypes, string> = {
 
 export type ErrorTypes = LifecycleHooks | ErrorCodes | WatchErrorCodes
 
+//
+/**
+ * 统一的错误处理包装函数
+ *
+ * 该函数接收一个函数 fn 并执行它,同时捕获可能发生的错误:
+ * - 如果提供了参数 args,则使用这些参数调用 fn
+ * - 如果没有提供参数,则直接调用 fn
+ * - 如果执行过程中发生错误,会调用 handleError 进行统一的错误处理
+ *
+ * @param fn - 需要执行的函数
+ * @param instance - 组件实例,用于错误处理时提供上下文
+ * @param type - 错误类型,用于标识错误发生的位置(如生命周期钩子、渲染函数等)
+ * @param args - 可选的函数参数
+ * @returns 函数执行的结果
+ */
 export function callWithErrorHandling(
   fn: Function,
   instance: ComponentInternalInstance | null | undefined,

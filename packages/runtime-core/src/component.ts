@@ -788,6 +788,7 @@ export function validateComponentName(
   }
 }
 
+// 判断组件是否是有状态组件
 export function isStatefulComponent(
   instance: ComponentInternalInstance,
 ): number {
@@ -796,6 +797,7 @@ export function isStatefulComponent(
 
 export let isInSSRComponentSetup = false
 
+// 设置组件的内部实例
 export function setupComponent(
   instance: ComponentInternalInstance,
   isSSR = false,
@@ -804,10 +806,15 @@ export function setupComponent(
   isSSR && setInSSRSetupState(isSSR)
 
   const { props, children } = instance.vnode
+
+  // 判断组件是否是有状态组件
   const isStateful = isStatefulComponent(instance)
+  // 初始化props
   initProps(instance, props, isStateful, isSSR)
+  // 初始化slots
   initSlots(instance, children, optimized)
 
+  // 初始化setupState
   const setupResult = isStateful
     ? setupStatefulComponent(instance, isSSR)
     : undefined
@@ -816,10 +823,12 @@ export function setupComponent(
   return setupResult
 }
 
+// 设置有状态组件
 function setupStatefulComponent(
   instance: ComponentInternalInstance,
   isSSR: boolean,
 ) {
+  // 1. 定义Component变量
   const Component = instance.type as ComponentOptions
 
   if (__DEV__) {
@@ -846,20 +855,22 @@ function setupStatefulComponent(
       )
     }
   }
-  // 0. create render proxy property access cache 创建缓存
+  // 2. 创建渲染代理属性访问缓存
   instance.accessCache = Object.create(null)
-  // 1. create public instance / render proxy
-  instance.proxy = new Proxy(instance.ctx, PublicInstanceProxyHandlers)  // 创建代理
+  // 3. 创建公共实例/渲染代理
+  instance.proxy = new Proxy(instance.ctx, PublicInstanceProxyHandlers) // 创建代理
   if (__DEV__) {
     exposePropsOnRenderContext(instance)
   }
-  // 2. call setup()
+  // 4. 执行 setup 函数
   const { setup } = Component
   if (setup) {
     pauseTracking()
+    // 如果setup函数含有参数，则创建一个 setupContext
     const setupContext = (instance.setupContext =
       setup.length > 1 ? createSetupContext(instance) : null)
     const reset = setCurrentInstance(instance)
+    // 执行setup函数，获取执行结果
     const setupResult = callWithErrorHandling(
       setup,
       instance,
@@ -909,13 +920,33 @@ function setupStatefulComponent(
         )
       }
     } else {
+      // 处理setup函数执行结果
       handleSetupResult(instance, setupResult, isSSR)
     }
   } else {
+    // 5. 完成组件实例设置
     finishComponentSetup(instance, isSSR)
   }
 }
 
+/**
+ * 处理组件setup()函数的返回结果
+ *
+ * 该函数主要处理以下几种情况:
+ * 1. 如果返回值是函数:
+ *    - 在SSR模式下且有内联渲染函数时,将其设置为ssrRender
+ *    - 否则将其设置为组件的render函数
+ *
+ * 2. 如果返回值是对象:
+ *    - 开发环境下会检查是否误返回了VNode,给出警告
+ *    - 将返回的对象设置为setupState,可在模板中访问
+ *    - 开发环境下会保存原始setup状态用于devtools
+ *
+ * 3. 如果返回值既不是函数也不是对象:
+ *    - 开发环境下给出警告,setup应该返回对象
+ *
+ * 最后调用finishComponentSetup完成组件设置
+ */
 export function handleSetupResult(
   instance: ComponentInternalInstance,
   setupResult: unknown,
@@ -980,6 +1011,29 @@ export function registerRuntimeCompiler(_compile: any): void {
 // dev only
 export const isRuntimeOnly = (): boolean => !compile
 
+/**
+ * 完成组件实例的设置工作。主要职责包括:
+ *
+ * 1. 处理模板/渲染函数的规范化:
+ * - 如果实例还没有 render 函数,会尝试编译 template 为 render 函数
+ * - 支持运行时编译 template,但 SSR 场景下由 server-renderer 处理
+ * - 处理 inline-template 等兼容性选项
+ *
+ * 2. 安装代理:
+ * - 对于使用 with 块的运行时编译的渲染函数,安装性能更好的代理处理器
+ *
+ * 3. 处理 Options API:
+ * - 如果启用了 Options API 特性,会应用组件的选项配置
+ * - 暂停/恢复响应式追踪,确保选项处理过程的正确性
+ *
+ * 4. 开发环境下的告警:
+ * - 在缺少必要的 template/render 时发出警告
+ * - 提供运行时编译相关的提示信息
+ *
+ * @param instance - 组件实例
+ * @param isSSR - 是否是服务端渲染
+ * @param skipOptions - 是否跳过选项处理(兼容模式使用)
+ */
 export function finishComponentSetup(
   instance: ComponentInternalInstance,
   isSSR: boolean,
@@ -1119,6 +1173,7 @@ function getSlotsProxy(instance: ComponentInternalInstance): Slots {
   })
 }
 
+// 创建 setup 上下文
 export function createSetupContext(
   instance: ComponentInternalInstance,
 ): SetupContext {

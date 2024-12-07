@@ -410,6 +410,7 @@ export const isReservedPrefix = (key: string): key is '_' | '$' =>
 const hasSetupBinding = (state: Data, key: string) =>
   state !== EMPTY_OBJ && !state.__isScriptSetup && hasOwn(state, key)
 
+//  公共实例代理处理器
 export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
   get({ _: instance }: ComponentRenderContext, key: string) {
     if (key === ReactiveFlags.SKIP) {
@@ -424,16 +425,19 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
       return true
     }
 
-    // data / props / ctx
-    // This getter gets called for every property access on the render context
-    // during render and is a major hotspot. The most expensive part of this
-    // is the multiple hasOwn() calls. It's much faster to do a simple property
-    // access on a plain object, so we use an accessCache object (with null
-    // prototype) to memoize what access type a key corresponds to.
+    //数据/道具/ctx
+    //渲染上下文中的每个属性访问都会调用此 getter
+    //渲染期间是一个主要热点。这里面最贵的部分
+    //是多个 hasOwn() 调用。做一个简单的属性要快得多
+    //访问普通对象，因此我们使用 accessCache 对象（带有 null
+    //原型）来记住键对应的访问类型。
     let normalizedProps
     if (key[0] !== '$') {
+      // 是否是vue的内置属性
+      // 首先从缓存中获取访问类型，这也就是为什么需要创建一个缓存对象的原因（setupStatefulComponent函数的第二步）
       const n = accessCache![key]
       if (n !== undefined) {
+        // 如果存在缓存则直接通过缓存的访问类型来获取值
         switch (n) {
           case AccessTypes.SETUP:
             return setupState[key]
@@ -446,24 +450,24 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
           // default: just fallthrough
         }
       } else if (hasSetupBinding(setupState, key)) {
-        accessCache![key] = AccessTypes.SETUP
+        accessCache![key] = AccessTypes.SETUP // 缓存访问类型
         return setupState[key]
       } else if (data !== EMPTY_OBJ && hasOwn(data, key)) {
-        accessCache![key] = AccessTypes.DATA
+        accessCache![key] = AccessTypes.DATA // 缓存访问类型
         return data[key]
       } else if (
-        // only cache other properties when instance has declared (thus stable)
+        // 仅在声明实例时缓存其他属性（因此稳定）
         // props
         (normalizedProps = instance.propsOptions[0]) &&
         hasOwn(normalizedProps, key)
       ) {
-        accessCache![key] = AccessTypes.PROPS
+        accessCache![key] = AccessTypes.PROPS // 缓存访问类型
         return props![key]
       } else if (ctx !== EMPTY_OBJ && hasOwn(ctx, key)) {
-        accessCache![key] = AccessTypes.CONTEXT
+        accessCache![key] = AccessTypes.CONTEXT // 缓存访问类型
         return ctx[key]
       } else if (!__FEATURE_OPTIONS_API__ || shouldCacheAccess) {
-        accessCache![key] = AccessTypes.OTHER
+        accessCache![key] = AccessTypes.OTHER // 缓存访问类型
       }
     }
 
@@ -535,7 +539,9 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
     value: any,
   ): boolean {
     const { data, setupState, ctx } = instance
+
     if (hasSetupBinding(setupState, key)) {
+      // 设置 setupState
       setupState[key] = value
       return true
     } else if (
@@ -543,23 +549,28 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
       setupState.__isScriptSetup &&
       hasOwn(setupState, key)
     ) {
+      // 开发环境下检查是否试图修改<script setup>中的绑定
       warn(`Cannot mutate <script setup> binding "${key}" from Options API.`)
       return false
     } else if (data !== EMPTY_OBJ && hasOwn(data, key)) {
+      // 设置 data
       data[key] = value
       return true
     } else if (hasOwn(instance.props, key)) {
+      // 不能给 props 赋值
       __DEV__ && warn(`Attempting to mutate prop "${key}". Props are readonly.`)
       return false
     }
     if (key[0] === '$' && key.slice(1) in instance) {
       __DEV__ &&
+        // 不能给组件实例上的内置属性赋值
         warn(
           `Attempting to mutate public property "${key}". ` +
             `Properties starting with $ are reserved and readonly.`,
         )
       return false
     } else {
+      // 用户自定义数据赋值
       if (__DEV__ && key in instance.appContext.config.globalProperties) {
         Object.defineProperty(ctx, key, {
           enumerable: true,
