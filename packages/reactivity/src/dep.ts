@@ -244,27 +244,39 @@ export const ARRAY_ITERATE_KEY: unique symbol = Symbol(
 )
 
 /**
- * Tracks access to a reactive property.
+ * 追踪响应式属性的访问
  *
- * This will check which effect is running at the moment and record it as dep
- * which records all effects that depend on the reactive property.
+ * 这个函数会检查当前正在运行的 effect,并将其记录为依赖。
+ * 依赖会记录所有依赖于该响应式属性的 effects。
  *
- * @param target - Object holding the reactive property.
- * @param type - Defines the type of access to the reactive property.
- * @param key - Identifier of the reactive property to track.
+ * 整体流程:
+ * 1. 检查是否应该追踪以及是否有活跃的订阅者
+ * 2. 获取/创建 target 对应的依赖 Map
+ * 3. 获取/创建属性 key 对应的 dep 实例
+ * 4. 调用 dep.track() 进行依赖追踪
+ *
+ * @param target - 持有响应式属性的对象
+ * @param type - 定义对响应式属性的访问类型
+ * @param key - 要追踪的响应式属性的标识符
  */
 export function track(target: object, type: TrackOpTypes, key: unknown): void {
+  // 只有在允许追踪且有活跃订阅者时才进行追踪
   if (shouldTrack && activeSub) {
+    // 获取 target 对象对应的依赖 Map
     let depsMap = targetMap.get(target)
+    // 如果不存在则创建新的 Map
     if (!depsMap) {
       targetMap.set(target, (depsMap = new Map()))
     }
+    // 获取属性 key 对应的依赖对象
     let dep = depsMap.get(key)
+    // 如果依赖对象不存在则创建新的依赖对象
     if (!dep) {
       depsMap.set(key, (dep = new Dep()))
       dep.map = depsMap
       dep.key = key
     }
+    // 在开发环境下,传入更多的追踪信息
     if (__DEV__) {
       dep.track({
         target,

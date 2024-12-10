@@ -66,8 +66,22 @@ export const objectToString: typeof Object.prototype.toString =
 export const toTypeString = (value: unknown): string =>
   objectToString.call(value)
 
+/**
+ * 获取值的原始类型字符串
+ * @param value - 要获取类型的值
+ * @returns 返回值的原始类型字符串
+ * @example
+ * toRawType({}) // 'Object'
+ * toRawType([]) // 'Array'
+ * toRawType(new Map()) // 'Map'
+ * toRawType(new Set()) // 'Set'
+ * toRawType(null) // 'Null'
+ * toRawType(undefined) // 'Undefined'
+ * toRawType(123) // 'Number'
+ */
 export const toRawType = (value: unknown): string => {
-  // extract "RawType" from strings like "[object RawType]"
+  // 从 "[object RawType]" 格式的字符串中提取出 "RawType"
+  // 使用 slice(8, -1) 去掉开头的 "[object " 和结尾的 "]"
   return toTypeString(value).slice(8, -1)
 }
 

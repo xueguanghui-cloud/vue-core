@@ -40,25 +40,47 @@ enum TargetType {
   COLLECTION = 2,
 }
 
+/**
+ * 根据原始类型字符串返回目标对象的类型
+ * @param rawType 目标对象的原始类型字符串
+ * @returns {TargetType} 返回目标对象的类型
+ * - COMMON: 普通对象(Object)或数组(Array)
+ * - COLLECTION: 集合类型(Map、Set、WeakMap、WeakSet)
+ * - INVALID: 其他不支持的类型
+ */
 function targetTypeMap(rawType: string) {
   switch (rawType) {
     case 'Object':
     case 'Array':
+      // 普通对象和数组返回 COMMON 类型
       return TargetType.COMMON
     case 'Map':
     case 'Set':
     case 'WeakMap':
     case 'WeakSet':
+      // 集合类型返回 COLLECTION 类型
       return TargetType.COLLECTION
     default:
+      // 其他类型返回 INVALID
       return TargetType.INVALID
   }
 }
 
+/**
+ * 获取目标对象的类型
+ * @param value 目标对象
+ * @returns {TargetType} 返回目标对象的类型
+ * - INVALID: 不可扩展或被标记为跳过的对象
+ * - COMMON: 普通对象(Object)或数组(Array)
+ * - COLLECTION: 集合类型(Map、Set、WeakMap、WeakSet)
+ */
 function getTargetType(value: Target) {
+  // 如果对象被标记为跳过(SKIP)或者不可扩展,则返回 INVALID 类型
+  // Object.isExtensible() 判断一个对象是否可扩展(是否可以添加新的属性)
   return value[ReactiveFlags.SKIP] || !Object.isExtensible(value)
     ? TargetType.INVALID
-    : targetTypeMap(toRawType(value))
+    : // 否则根据对象的原始类型返回对应的 TargetType
+      targetTypeMap(toRawType(value))
 }
 
 // only unwrap nested ref
@@ -89,11 +111,13 @@ export type Reactive<T> = UnwrapNestedRefs<T> &
  * @see {@link https://vuejs.org/api/reactivity-core.html#reactive}
  */
 export function reactive<T extends object>(target: T): Reactive<T>
+
 export function reactive(target: object) {
-  // if trying to observe a readonly proxy, return the readonly version.
+  // 如果是readonly，则不需要进行响应式
   if (isReadonly(target)) {
     return target
   }
+  // 创建响应式对象
   return createReactiveObject(
     target,
     false,
@@ -254,6 +278,15 @@ export function shallowReadonly<T extends object>(target: T): Readonly<T> {
   )
 }
 
+/**
+ * 创建响应式对象的核心函数
+ * @param target 目标对象
+ * @param isReadonly 是否只读
+ * @param baseHandlers 基本类型的 handlers
+ * @param collectionHandlers 集合类型的 handlers
+ * @param proxyMap 代理对象的 WeakMap
+ * @returns 代理对象
+ */
 function createReactiveObject(
   target: Target,
   isReadonly: boolean,
@@ -261,6 +294,7 @@ function createReactiveObject(
   collectionHandlers: ProxyHandler<any>,
   proxyMap: WeakMap<Target, any>,
 ) {
+  // 如果目标不是对象，直接返回（在开发环境下给出警告）
   if (!isObject(target)) {
     if (__DEV__) {
       warn(
@@ -271,28 +305,34 @@ function createReactiveObject(
     }
     return target
   }
-  // target is already a Proxy, return it.
-  // exception: calling readonly() on a reactive object
+
+  // 如果目标已经是响应式对象，直接返回
   if (
     target[ReactiveFlags.RAW] &&
     !(isReadonly && target[ReactiveFlags.IS_REACTIVE])
   ) {
     return target
   }
-  // target already has corresponding Proxy
+
+  // 检查目标对象是否已有对应的代理
   const existingProxy = proxyMap.get(target)
   if (existingProxy) {
     return existingProxy
   }
-  // only specific value types can be observed.
+
+  // 获取目标对象的类型，只有特定类型的值可以被observe
   const targetType = getTargetType(target)
   if (targetType === TargetType.INVALID) {
     return target
   }
+
+  // 创建代理对象
+  // 如果是集合类型使用 collectionHandlers，否则使用 baseHandlers
   const proxy = new Proxy(
     target,
     targetType === TargetType.COLLECTION ? collectionHandlers : baseHandlers,
   )
+  // 缓存 target proxy
   proxyMap.set(target, proxy)
   return proxy
 }
