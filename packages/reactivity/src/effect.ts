@@ -83,33 +83,53 @@ export interface Subscriber extends DebuggerOptions {
 
 const pausedQueueEffects = new WeakSet<ReactiveEffect>()
 
+/**
+ * 响应式副作用类,用于跟踪和执行响应式依赖
+ */
 export class ReactiveEffect<T = any>
   implements Subscriber, ReactiveEffectOptions
 {
   /**
+   * 依赖链表的头节点
    * @internal
    */
   deps?: Link = undefined
   /**
+   * 依赖链表的尾节点
    * @internal
    */
   depsTail?: Link = undefined
   /**
+   * 副作用的状态标记
    * @internal
    */
   flags: EffectFlags = EffectFlags.ACTIVE | EffectFlags.TRACKING
   /**
+   * 用于批处理时链接下一个订阅者
    * @internal
    */
   next?: Subscriber = undefined
   /**
+   * 清理函数,在副作用重新执行前调用
    * @internal
    */
   cleanup?: () => void = undefined
 
+  /**
+   * 调度器函数,用于控制副作用的执行时机
+   */
   scheduler?: EffectScheduler = undefined
+  /**
+   * 停止时的回调函数
+   */
   onStop?: () => void
+  /**
+   * 追踪依赖时的调试回调
+   */
   onTrack?: (event: DebuggerEvent) => void
+  /**
+   * 触发更新时的调试回调
+   */
   onTrigger?: (event: DebuggerEvent) => void
 
   constructor(public fn: () => T) {
@@ -118,10 +138,16 @@ export class ReactiveEffect<T = any>
     }
   }
 
+  /**
+   * 暂停副作用的执行
+   */
   pause(): void {
     this.flags |= EffectFlags.PAUSED
   }
 
+  /**
+   * 恢复副作用的执行
+   */
   resume(): void {
     if (this.flags & EffectFlags.PAUSED) {
       this.flags &= ~EffectFlags.PAUSED
@@ -133,6 +159,7 @@ export class ReactiveEffect<T = any>
   }
 
   /**
+   * 通知副作用需要重新执行
    * @internal
    */
   notify(): void {
@@ -147,17 +174,21 @@ export class ReactiveEffect<T = any>
     }
   }
 
+  /**
+   * 执行副作用函数
+   */
   run(): T {
     // TODO cleanupEffect
-
+    // 若当前 ReactiveEffect 实例处于非激活状态,那么其对应的副作用函数被执行时不会再收集依赖
     if (!(this.flags & EffectFlags.ACTIVE)) {
       // stopped during cleanup
       return this.fn()
     }
 
     this.flags |= EffectFlags.RUNNING
-    cleanupEffect(this)
-    prepareDeps(this)
+    cleanupEffect(this) // 清除依赖
+    prepareDeps(this) // 获取依赖
+    // 通过 preEffect 标记，来回切换 activeEffect 的指向，从而完成对嵌套 effect 的正确的依赖手记
     const prevEffect = activeSub
     const prevShouldTrack = shouldTrack
     activeSub = this
@@ -179,6 +210,9 @@ export class ReactiveEffect<T = any>
     }
   }
 
+  /**
+   * 停止副作用的执行
+   */
   stop(): void {
     if (this.flags & EffectFlags.ACTIVE) {
       for (let link = this.deps; link; link = link.nextDep) {
@@ -191,6 +225,9 @@ export class ReactiveEffect<T = any>
     }
   }
 
+  /**
+   * 触发副作用的执行
+   */
   trigger(): void {
     if (this.flags & EffectFlags.PAUSED) {
       pausedQueueEffects.add(this)
@@ -202,6 +239,7 @@ export class ReactiveEffect<T = any>
   }
 
   /**
+   * 如果副作用为脏,则执行它
    * @internal
    */
   runIfDirty(): void {
@@ -210,6 +248,9 @@ export class ReactiveEffect<T = any>
     }
   }
 
+  /**
+   * 获取副作用是否为脏的状态
+   */
   get dirty(): boolean {
     return isDirty(this)
   }
@@ -473,24 +514,38 @@ export interface ReactiveEffectRunner<T = any> {
   effect: ReactiveEffect
 }
 
+/**
+ * 创建一个响应式副作用函数
+ * @param fn 要执行的副作用函数
+ * @param options 配置选项,可以包含调度器、调试选项等
+ * @returns 返回一个runner函数,调用它会重新执行副作用
+ */
 export function effect<T = any>(
   fn: () => T,
   options?: ReactiveEffectOptions,
 ): ReactiveEffectRunner<T> {
+  // 如果传入的fn已经是一个runner,则提取原始的副作用函数
   if ((fn as ReactiveEffectRunner).effect instanceof ReactiveEffect) {
     fn = (fn as ReactiveEffectRunner).effect.fn
   }
 
+  // 创建响应式副作用实例
   const e = new ReactiveEffect(fn)
+
+  // 如果有配置选项,扩展到副作用实例上
   if (options) {
     extend(e, options)
   }
+
+  // 首次执行副作用函数,如果出错则停止并抛出错误
   try {
     e.run()
   } catch (err) {
     e.stop()
     throw err
   }
+
+  // 创建并返回runner函数
   const runner = e.run.bind(e) as ReactiveEffectRunner
   runner.effect = e
   return runner
