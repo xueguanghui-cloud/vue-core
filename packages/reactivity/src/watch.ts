@@ -117,13 +117,26 @@ export function onWatcherCleanup(
   }
 }
 
+/**
+ * 创建一个观察者,用于监听响应式数据的变化
+ * @param source - 要观察的数据源,可以是:
+ *                - getter/effect 函数
+ *                - ref
+ *                - reactive 对象
+ *                - 以上类型的数组
+ * @param cb - 数据变化时的回调函数
+ * @param options - 配置选项
+ * @returns 返回一个包含 pause/resume/stop 方法的句柄
+ */
 export function watch(
   source: WatchSource | WatchSource[] | WatchEffect | object,
   cb?: WatchCallback | null,
   options: WatchOptions = EMPTY_OBJ,
 ): WatchHandle {
+  // 解构配置选项
   const { immediate, deep, once, scheduler, augmentJob, call } = options
 
+  // 无效数据源的警告函数
   const warnInvalidSource = (s: unknown) => {
     ;(options.onWarn || warn)(
       `Invalid watch source: `,
@@ -133,13 +146,14 @@ export function watch(
     )
   }
 
+  // 处理响应式对象的 getter 函数
   const reactiveGetter = (source: object) => {
-    // traverse will happen in wrapped getter below
+    // 如果是深度监听,直接返回源对象
     if (deep) return source
-    // for `deep: false | 0` or shallow reactive, only traverse root-level properties
+    // 对于浅层响应式或 deep: false/0,只遍历根级属性
     if (isShallow(source) || deep === false || deep === 0)
       return traverse(source, 1)
-    // for `deep: undefined` on a reactive object, deeply traverse all properties
+    // 对于未指定 deep 的响应式对象,深度遍历所有属性
     return traverse(source)
   }
 
@@ -150,13 +164,17 @@ export function watch(
   let forceTrigger = false
   let isMultiSource = false
 
+  // 根据数据源类型设置相应的 getter
   if (isRef(source)) {
+    // ref 类型
     getter = () => source.value
     forceTrigger = isShallow(source)
   } else if (isReactive(source)) {
+    // reactive 对象
     getter = () => reactiveGetter(source)
     forceTrigger = true
   } else if (isArray(source)) {
+    // 数组类型
     isMultiSource = true
     forceTrigger = source.some(s => isReactive(s) || isShallow(s))
     getter = () =>
@@ -173,12 +191,12 @@ export function watch(
       })
   } else if (isFunction(source)) {
     if (cb) {
-      // getter with cb
+      // 带回调的 getter
       getter = call
         ? () => call(source, WatchErrorCodes.WATCH_GETTER)
         : (source as () => any)
     } else {
-      // no cb -> simple effect
+      // 无回调的简单 effect
       getter = () => {
         if (cleanup) {
           pauseTracking()
@@ -200,10 +218,12 @@ export function watch(
       }
     }
   } else {
+    // 无效的数据源
     getter = NOOP
     __DEV__ && warnInvalidSource(source)
   }
 
+  // 处理深度监听
   if (cb && deep) {
     const baseGetter = getter
     const depth = deep === true ? Infinity : deep
@@ -211,6 +231,7 @@ export function watch(
   }
 
   const scope = getCurrentScope()
+  // 创建观察者句柄
   const watchHandle: WatchHandle = () => {
     effect.stop()
     if (scope) {
@@ -218,6 +239,7 @@ export function watch(
     }
   }
 
+  // 处理一次性监听
   if (once && cb) {
     const _cb = cb
     cb = (...args) => {
@@ -226,10 +248,12 @@ export function watch(
     }
   }
 
+  // 初始化旧值
   let oldValue: any = isMultiSource
     ? new Array((source as []).length).fill(INITIAL_WATCHER_VALUE)
     : INITIAL_WATCHER_VALUE
 
+  // 定义任务函数
   const job = (immediateFirstRun?: boolean) => {
     if (
       !(effect.flags & EffectFlags.ACTIVE) ||
@@ -238,7 +262,7 @@ export function watch(
       return
     }
     if (cb) {
-      // watch(source, cb)
+      // watch(source, cb) 模式
       const newValue = effect.run()
       if (
         deep ||
@@ -247,7 +271,7 @@ export function watch(
           ? (newValue as any[]).some((v, i) => hasChanged(v, oldValue[i]))
           : hasChanged(newValue, oldValue))
       ) {
-        // cleanup before running cb again
+        // 在运行回调前执行清理
         if (cleanup) {
           cleanup()
         }
@@ -256,7 +280,7 @@ export function watch(
         try {
           const args = [
             newValue,
-            // pass undefined as the old value when it's changed for the first time
+            // 首次变化时传递 undefined 作为旧值
             oldValue === INITIAL_WATCHER_VALUE
               ? undefined
               : isMultiSource && oldValue[0] === INITIAL_WATCHER_VALUE
@@ -274,23 +298,28 @@ export function watch(
         }
       }
     } else {
-      // watchEffect
+      // watchEffect 模式
       effect.run()
     }
   }
 
+  // 增强任务函数
   if (augmentJob) {
     augmentJob(job)
   }
 
+  // 创建响应式效果
   effect = new ReactiveEffect(getter)
 
+  // 设置调度器
   effect.scheduler = scheduler
     ? () => scheduler(job, false)
     : (job as EffectScheduler)
 
+  // 绑定清理函数
   boundCleanup = fn => onWatcherCleanup(fn, false, effect)
 
+  // 设置停止时的清理逻辑
   cleanup = effect.onStop = () => {
     const cleanups = cleanupMap.get(effect)
     if (cleanups) {
@@ -303,12 +332,13 @@ export function watch(
     }
   }
 
+  // 开发环境下的追踪和触发回调
   if (__DEV__) {
     effect.onTrack = options.onTrack
     effect.onTrigger = options.onTrigger
   }
 
-  // initial run
+  // 初始运行
   if (cb) {
     if (immediate) {
       job(true)
@@ -321,6 +351,7 @@ export function watch(
     effect.run()
   }
 
+  // 设置句柄方法
   watchHandle.pause = effect.pause.bind(effect)
   watchHandle.resume = effect.resume.bind(effect)
   watchHandle.stop = watchHandle

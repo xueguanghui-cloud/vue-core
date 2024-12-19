@@ -1613,7 +1613,7 @@ function baseCreateRenderer(
     effect.scheduler = () => queueJob(job)
 
     // allowRecurse
-    // #1801, #2043 component render effects should allow recursive updates
+    // #1801, #2043 组件允许递归更新
     toggleRecurse(instance, true)
 
     if (__DEV__) {
@@ -1629,22 +1629,38 @@ function baseCreateRenderer(
     update()
   }
 
+  /**
+   * 更新组件的预渲染状态
+   * 主要用于异步组件在 setup 完成前的 props 和 slots 更新
+   *
+   * @param instance - 组件实例
+   * @param nextVNode - 新的虚拟节点
+   * @param optimized - 是否优化
+   */
   const updateComponentPreRender = (
     instance: ComponentInternalInstance,
     nextVNode: VNode,
     optimized: boolean,
   ) => {
+    // 更新组件实例引用
     nextVNode.component = instance
+    // 保存之前的 props 用于对比
     const prevProps = instance.vnode.props
+    // 更新组件实例上的 vnode
     instance.vnode = nextVNode
+    // 清空 next 标记
     instance.next = null
+    // 更新组件的 props
     updateProps(instance, nextVNode.props, prevProps, optimized)
+    // 更新组件的插槽
     updateSlots(instance, nextVNode.children, optimized)
 
+    // 暂停依赖收集
     pauseTracking()
-    // props update may have triggered pre-flush watchers.
-    // flush them before the render update.
+    // props 更新可能触发了 pre-flush watchers
+    // 在渲染更新前需要执行这些 watchers
     flushPreFlushCbs(instance)
+    // 恢复依赖收集
     resetTracking()
   }
 

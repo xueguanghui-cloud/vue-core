@@ -44,64 +44,83 @@ export interface WritableComputedOptions<T, S = T> {
  * @private exported by @vue/reactivity for Vue core use, but not exported from
  * the main vue package
  */
+/**
+ * 计算属性的实现类
+ * @template T 计算属性的值类型
+ */
 export class ComputedRefImpl<T = any> implements Subscriber {
   /**
+   * 计算属性的内部值
    * @internal
    */
   _value: any = undefined
   /**
+   * 依赖收集器
    * @internal
    */
   readonly dep: Dep = new Dep(this)
   /**
+   * 标识这是一个 ref 对象
    * @internal
    */
   readonly __v_isRef = true
   // TODO isolatedDeclarations ReactiveFlags.IS_REF
   /**
+   * 标识这是一个只读的计算属性
    * @internal
    */
   readonly __v_isReadonly: boolean
   // TODO isolatedDeclarations ReactiveFlags.IS_READONLY
-  // A computed is also a subscriber that tracks other deps
   /**
+   * 当前计算属性依赖的其他响应式对象链表头
    * @internal
    */
   deps?: Link = undefined
   /**
+   * 依赖链表尾
    * @internal
    */
   depsTail?: Link = undefined
   /**
+   * 计算属性的状态标记
    * @internal
    */
   flags: EffectFlags = EffectFlags.DIRTY
   /**
+   * 全局版本号,用于追踪更新
    * @internal
    */
   globalVersion: number = globalVersion - 1
   /**
+   * 是否是服务端渲染
    * @internal
    */
   isSSR: boolean
   /**
+   * 调度队列中的下一个订阅者
    * @internal
    */
   next?: Subscriber = undefined
 
-  // for backwards compat
+  // 向后兼容
   effect: this = this
-  // dev only
+  // 仅用于开发环境
   onTrack?: (event: DebuggerEvent) => void
-  // dev only
+  // 仅用于开发环境
   onTrigger?: (event: DebuggerEvent) => void
 
   /**
-   * Dev only
+   * 开发环境下用于警告递归计算
    * @internal
    */
   _warnRecursive?: boolean
 
+  /**
+   * 构造函数
+   * @param fn 计算属性的 getter 函数
+   * @param setter 计算属性的 setter 函数,如果没有则为只读
+   * @param isSSR 是否是服务端渲染
+   */
   constructor(
     public fn: ComputedGetter<T>,
     private readonly setter: ComputedSetter<T> | undefined,
@@ -112,13 +131,14 @@ export class ComputedRefImpl<T = any> implements Subscriber {
   }
 
   /**
+   * 通知订阅者更新
    * @internal
    */
   notify(): true | void {
     this.flags |= EffectFlags.DIRTY
     if (
       !(this.flags & EffectFlags.NOTIFIED) &&
-      // avoid infinite self recursion
+      // 避免无限自递归
       activeSub !== this
     ) {
       batch(this, true)
@@ -128,6 +148,9 @@ export class ComputedRefImpl<T = any> implements Subscriber {
     }
   }
 
+  /**
+   * 获取计算属性的值
+   */
   get value(): T {
     const link = __DEV__
       ? this.dep.track({
@@ -137,13 +160,16 @@ export class ComputedRefImpl<T = any> implements Subscriber {
         })
       : this.dep.track()
     refreshComputed(this)
-    // sync version after evaluation
+    // 同步版本号
     if (link) {
       link.version = this.dep.version
     }
     return this._value
   }
 
+  /**
+   * 设置计算属性的值
+   */
   set value(newValue) {
     if (this.setter) {
       this.setter(newValue)
@@ -202,6 +228,7 @@ export function computed<T>(
   let getter: ComputedGetter<T>
   let setter: ComputedSetter<T> | undefined
 
+  // 判断 getterOriOptions 是不是一个函数，根据不同情况 拿去对应的getter setter
   if (isFunction(getterOrOptions)) {
     getter = getterOrOptions
   } else {
@@ -209,6 +236,7 @@ export function computed<T>(
     setter = getterOrOptions.set
   }
 
+  // 构造一个ref响应式对象
   const cRef = new ComputedRefImpl(getter, setter, isSSR)
 
   if (__DEV__ && debugOptions && !isSSR) {
