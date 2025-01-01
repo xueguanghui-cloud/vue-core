@@ -1035,11 +1035,21 @@ function reset() {
   stack.length = 0
 }
 
+/**
+ * 基础解析函数,将模板字符串解析为AST
+ * @param input - 输入的模板字符串
+ * @param options - 解析选项
+ * @returns AST根节点
+ */
 export function baseParse(input: string, options?: ParserOptions): RootNode {
+  // 重置解析器状态
   reset()
+  // 设置当前输入
   currentInput = input
+  // 使用默认解析选项
   currentOptions = extend({}, defaultParserOptions)
 
+  // 合并自定义选项
   if (options) {
     let key: keyof ParserOptions
     for (key in options) {
@@ -1050,6 +1060,7 @@ export function baseParse(input: string, options?: ParserOptions): RootNode {
     }
   }
 
+  // 开发环境下的选项检查
   if (__DEV__) {
     if (!__BROWSER__ && currentOptions.decodeEntities) {
       console.warn(
@@ -1063,6 +1074,7 @@ export function baseParse(input: string, options?: ParserOptions): RootNode {
     }
   }
 
+  // 设置解析器模式(HTML/SFC/BASE)
   tokenizer.mode =
     currentOptions.parseMode === 'html'
       ? ParseMode.HTML
@@ -1070,20 +1082,26 @@ export function baseParse(input: string, options?: ParserOptions): RootNode {
         ? ParseMode.SFC
         : ParseMode.BASE
 
+  // 设置是否在XML命名空间下解析
   tokenizer.inXML =
     currentOptions.ns === Namespaces.SVG ||
     currentOptions.ns === Namespaces.MATH_ML
 
+  // 设置自定义分隔符
   const delimiters = options && options.delimiters
   if (delimiters) {
     tokenizer.delimiterOpen = toCharCodes(delimiters[0])
     tokenizer.delimiterClose = toCharCodes(delimiters[1])
   }
 
+  // 创建并解析AST根节点
   const root = (currentRoot = createRoot([], input))
   tokenizer.parse(currentInput)
+  // 设置根节点位置信息
   root.loc = getLoc(0, input.length)
+  // 压缩空白字符
   root.children = condenseWhitespace(root.children)
+  // 清除当前根节点引用
   currentRoot = null
   return root
 }
